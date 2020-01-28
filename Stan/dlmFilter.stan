@@ -14,33 +14,39 @@ data {
     
      // Observation Stuff
     vector[M] y[N];         // Observations
-    matrix[M, P] F;         // Observation equation matrix
+    matrix[M, P] FF;         // Observation equation matrix
     cov_matrix[M] V;        // Known constant covariance matix for observation equation
     
      // State Stuff
-    matrix[P, P] G;         // State/transition equation matrix
+    matrix[P, P] GG;         // State/transition equation matrix
     cov_matrix[M] W;        // Known constant covariance matix for state transition equation
     
     vector[P] m0;           // Initial state vector prior mean
     matrix[P, P] C0;        // Initial state vector prior variance-covariance matix
 }
+parameters {
+}
 transformed parameters {
+}
+model {
+}
+generated quantities {
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
     // distribution of state t given all observations through time t-1
     vector[P] a[N];
-    matrix[P, P] R[N];
+    cov_matrix[P] R[N];
     
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
     // distribution of observation t given all observations through time t-1
     vector[M] f[N];
-    matrix[M, M] Q[N];
-    matrix[M, M] Q_inv[N];
+    cov_matrix[M] Q[N];
+    cov_matrix[M] Q_inv[N];
     
     // mean and variance-covariance matix for filtering distribution of
     // state t given all observations through time t
     vector[M] err[N];
     vector[P] m[N+1];
-    matrix[P, P] C[N+1];
+    cov_matrix[P] C[N+1];
     
     // Intialize
     m[1] = m0;
@@ -48,17 +54,15 @@ transformed parameters {
     
     // Kalman filter
     for(n in 1:N) {
-        a[n] = G * m[n];
-        R[n] = G * C[n] * G' + W;
+        a[n] = GG * m[n];
+        R[n] = GG * C[n] * GG' + W;
         
-        f[n] = F * a[n];
-        Q[n] = F * R[n] * F' + V;
+        f[n] = FF * a[n];
+        Q[n] = FF * R[n] * FF' + V;
         
         Q_inv[n] = inverse(Q[n]);
         err[n] = y[n] - f[n];
-        m[n+1] = a[n] + R[n] * F' * Q_inv[n] * err[n];
-        C[n+1] = R[n] - R[n] * F' * Q_inv[n] * F * R[n];
+        m[n+1] = a[n] + R[n] * FF' * Q_inv[n] * err[n];
+        C[n+1] = R[n] - R[n] * FF' * Q_inv[n] * FF * R[n];
     }
-}
-model {
 }
