@@ -1,6 +1,7 @@
 /*
-Implement Kalman filter for Dynamic Linear Model with known and constant
-observation and state variance-covariance matix.
+Implement Kalman filter for multivariate Dynamic Linear Model with
+known and constant covariance matices for the observation equation 
+and the state transition equation.
 
 See Chapter 2.7 of Dynamic Linear Models with R - Petris et. al.
 
@@ -14,14 +15,14 @@ data {
      // Observation Stuff
     vector[M] y[N];         // Observations
     matrix[M, P] F;         // Observation equation matrix
-    cov_matrix[M] V;        // Known constant observation covariance matix
+    cov_matrix[M] V;        // Known constant covariance matix for observation equation
     
      // State Stuff
     matrix[P, P] G;         // State/transition equation matrix
-    cov_matrix[M] W;        // Known constant observation covariance matix
+    cov_matrix[M] W;        // Known constant covariance matix for state transition equation
     
     vector[P] m0;           // Initial state vector prior mean
-    matrix[P, P] C0;        // Intial state vector prior variance-covariance matix
+    matrix[P, P] C0;        // Initial state vector prior variance-covariance matix
 }
 transformed parameters {
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
