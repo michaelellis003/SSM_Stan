@@ -3,6 +3,8 @@ Implement Kalman filter for Dynamic Linear Model with known and constant
 observation and state variance-covariance matix.
 
 See Chapter 2.7 of Dynamic Linear Models with R - Petris et. al.
+
+TO DO: Add handling of missing values 
 */
 data {
     int<lower=1> N;         // Number of observations
@@ -21,10 +23,8 @@ data {
     vector[P] m0;           // Initial state vector prior mean
     matrix[P, P] C0;        // Intial state vector prior variance-covariance matix
 }
-parameters {
-}
-model {
-     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
+transformed parameters {
+    // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
     // distribution of state t given all observations through time t-1
     vector[P] a[N];
     matrix[P, P] R[N];
@@ -58,5 +58,6 @@ model {
         m[n+1] = a[n] + R[n] * F' * Q_inv[n] * err[n];
         C[n+1] = R[n] - R[n] * F' * Q_inv[n] * F * R[n];
     }
-    
+}
+model {
 }
