@@ -1,5 +1,5 @@
 /*
-Implement Kalman filter for multivariate Dynamic Linear Model with
+Implement Kalman smoother for multivariate Dynamic Linear Model with
 known and constant covariance matices for the observation equation 
 and the state transition equation.
 
@@ -32,21 +32,27 @@ model {
 }
 generated quantities {
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
-    // distribution of state t given all observations through time t-1
+    // distribution of state t given observations through time t-1
     vector[P] a[N];
     cov_matrix[P] R[N];
     
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
-    // distribution of observation t given all observations through time t-1
+    // distribution of observation t given observations through time t-1
     vector[M] f[N];
     cov_matrix[M] Q[N];
     cov_matrix[M] Q_inv[N];
     
     // mean and variance-covariance matix for filtering distribution of
-    // state t given all observations through time t
+    // state t given observations through time t
     vector[M] err[N];
     vector[P] m[N+1];
     cov_matrix[P] C[N+1];
+    
+    // mean and variance-covariance matix for smoothed distribution of
+    // state t given ALL observations through time T
+    cov_matrix[M] R_inv[N];
+    vector[P] s[N+1];
+    cov_matrix[P] S[N+1];
     
     // Kalman filter
     // Intialize
@@ -65,4 +71,22 @@ generated quantities {
         m[n+1] = a[n] + R[n] * FF' * Q_inv[n] * err[n];
         C[n+1] = R[n] - R[n] * FF' * Q_inv[n] * FF * R[n];
     }
+    
+    // Kalman smoother
+    // Intialize
+    s[N] = m[N+1];
+    S[N] = C[N+1];
+    
+    print("Kalman filter finished");
+    
+    for(n in (N-1):1){
+        //print(n);
+        R_inv[n+1] = inverse(R[n+1]);
+        
+        s[n] = m[n] + C[n] * GG' * R_inv[n+1] * (s[n+1] - a[n+1]);
+        
+        S[n] = C[n] - C[n] * GG' * R_inv[n+1] * (R_inv[n+1] - S[n+1]) * 
+                        R_inv[n+1] * GG * C[n];
+    }
 }
+
