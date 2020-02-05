@@ -1,5 +1,5 @@
 /*
-    Functions to compute singular value decomposition
+Functions to compute singular value decomposition
 
 See Appendix B of Dynamic Linear Models with R - Petris et. al.
 
@@ -23,7 +23,6 @@ functions {
             // The eigenvalues_sym funciton returns a vector of eigenvalues
             // of a symmetric matrix A in ascending order.
             MT_M_eigenvalues = eigenvalues_sym( M' * M);
-                print(MT_M_eigenvalues);
                                                     
             // Insert the q eigenvalues in decreasing order.
             // largest eigenvalue in q
@@ -54,7 +53,6 @@ functions {
         // eigenvalues returned by eigenvalues_sym
         MT_M = M' * M;
         backward_V = eigenvectors_sym(MT_M);
-        
         
         // Reverse the order of the  eigenvectors to match that the order of
         // the eigenvalues returned by eigenvalues_sym
@@ -88,12 +86,41 @@ functions {
         
         return U;
     }
+    
+    matrix sqrt_svd(matrix M) {
+        // Function to calculate sqrt of covariance matrix using SVD
+        // where the sqrt of a matrix is M^(1/2) such that
+        // M = M^(1/2) * M^(1/2)
+        
+        int p = rows(M);
+        int q = cols(M);
+        matrix[q, q] V;
+        matrix[p, q] D;
+        matrix[p, q] S;
+        matrix[p, p] U;
+        matrix[p, p] N; // square root of M;
+        
+        if(p != q) {
+            reject("Attempting to take square root of ", 
+            "non-square matix using SVD");
+        }
+        
+        V = V_svd(M);
+        D = D_svd(M);
+        U = U_svd(M, V, D);
+        S = sqrt(D);        
+        
+        N = S * V';
+        
+        return(N);
+    }
         
 }
 data {
     int<lower=1> p;
     int<lower=1> q;
-    matrix[p, q] M;       // Matrix to decompose
+    matrix[p, q] M;                             // Matrix to decompose
+    int<lower=0, upper=1> calc_sqrt;            // if equal to 1 find sqrt
 }
 parameters {
 }
@@ -106,4 +133,11 @@ generated quantities {
     matrix[q, q] V = V_svd(M);
     matrix[p, p] U = U_svd(M, V, D);
     matrix[p, q] M_svd = U * D * V';
+    cov_matrix[p] M_cov;
+    matrix[p, q] sqrt_M;
+    
+    if(calc_sqrt == 1){
+        M_cov = M;
+        sqrt_M = sqrt_svd(M_cov);
+    }
 }

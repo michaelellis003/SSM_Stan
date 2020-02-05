@@ -2,13 +2,8 @@ library(rstan)
 
 # generate random matrix
 n <- sample(1:5, size = 1)
-p <- sample(1:5, size = 1)
-A <-  matrix(runif(n), nrow=n, ncol=p) 
-A
-
-# using R function
-R_svd <- svd(A, nu = n, nv = p)
-#R_svd
+A <- matrix(runif(n^2)*2-1, ncol=n) 
+A <- t(A) %*% A
 
 # using Stan function
 stan_args <- list( 
@@ -16,7 +11,7 @@ stan_args <- list(
     q = ncol(A),
     M = A,
     calc_sqrt = 1
-    )
+)
 
 SVD_stan <- stan( 
     file = "Stan/SVD.stan",
@@ -28,11 +23,9 @@ SVD_stan <- stan(
     cores = 1
 )
 
-Stan_A <- extract(SVD_stan, pars = "M_svd")
-Stan_A <- as.matrix(Stan_A$M_svd[, , 1:p], nrow = n, ncol = p)
-if(n == 1){
-    Stan_A <- t(Stan_A)
-}
+sqrt_A <- extract(SVD_stan, pars = "sqrt_M")
+sqrt_A <- as.matrix(sqrt_A$sqrt_M[, , 1:n], nrow = n, ncol = n)
+Stan_A <- t(sqrt_A) %*% sqrt_A
 Stan_A
 A
 
@@ -45,14 +38,3 @@ for(i in 1:num_digits){
         break
     }
 }
-
-U <- extract(SVD_stan, pars = "U")
-V <- extract(SVD_stan, pars = "V")
-D <- extract(SVD_stan, pars = "D")
-
-U <- as.matrix(U$U[, , 1:n], nrow = n, ncol = p)
-V <- as.matrix(V$V[, , 1:p], nrow = p, ncol = min(n, p))
-D <- diag(as.vector(D$D[, , 1:p]), nrow = n, ncol = p)
-D
-U
-V

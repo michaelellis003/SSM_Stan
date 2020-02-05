@@ -11,30 +11,25 @@ Models  with R - Petris et. al.
 TO DO: Add handling of missing values 
 */
 functions {
-        
+    
     matrix D_svd(matrix M) {
-        // M is an p x q martix
-        // Singular Value Decomposition M = UDV'
-        // D is a p × q diagonal matrix where the first r diagonal 
-        // entries are the square roots of the eigenvalues of M'M in
-        // decreasing order and all other entires are zero
-        
-        int p = rows(M);
-        int q = cols(M);
-        int r = min(p, q);
-        matrix[p, q] D = rep_matrix(0, p, q);
-        vector[q] MT_M_eigenvalues;
+            // M is an p x q martix
+            // Singular Value Decomposition M = UDV'
+            // D is a p × q diagonal matrix where the first r diagonal 
+            // entries are the square roots of the eigenvalues of M'M in
+            // decreasing order and all other entires are zero
             
-        if(p == 1 && q == 1) {
-            // scalar
-            D[1, 1] = fabs(M[1, 1]);
-
-        } else {
-
+            int p = rows(M);
+            int q = cols(M);
+            int r = min(p, q);
+            matrix[p, q] D = rep_matrix(0, p, q);
+            vector[q] MT_M_eigenvalues;
+            
             // The eigenvalues_sym funciton returns a vector of eigenvalues
             // of a symmetric matrix A in ascending order.
             MT_M_eigenvalues = eigenvalues_sym( M' * M);
-
+                print(MT_M_eigenvalues);
+                                                    
             // Insert the q eigenvalues in decreasing order.
             // largest eigenvalue in q
             for(i in 1:r) {
@@ -43,44 +38,8 @@ functions {
                     D[i, i] = sqrt(value);
                 }
             }
-        }
-    
-        return D;
-    }
-    
-    matrix U_svd(matrix M) {
-        // M is an p x q martix
-        // Singular Value Decomposition M = UDV'
-        // U is a p × p orthogonal matrix whose columns are the 
-        // eigenvectors of MM'
-        
-        int p = rows(M);
-        int q = cols(M);
-        matrix[p, p] M_MT;
-        matrix[p, p] backward_U;
-        matrix[p, p] U;
-        
-         if(p == 1 && q == 1) {
-             if(M[1, 1] < 0) {
-                 U[1, 1] = -1;
-             } else {
-                 U[1, 1] = 1;
-             }
-         } else {
-            // The eigenvectors_sym function returns a matrix with the (column)
-            // eigenvectors of a symmetric matrix in the same order as the
-            // eigenvalue returned by eigenvalues_sym
-            M_MT = M * M';
-            backward_U = eigenvectors_sym(M_MT);
-
-            // Reverse the order of the  eigenvectors to match that the order of
-            // the eigenvalues returned by eigenvalues_sym
-            for(i in 1:p){
-                U[, i] = backward_U[, p-i+1];
-            }
-         }
-        
-        return U;
+                                                    
+            return D;
     }
     
     matrix V_svd(matrix M) {
@@ -88,30 +47,79 @@ functions {
         // M is an p x q martix
         // V is an q × q orthogonal matrix whose columns are the 
         // eigenvectors of M'M 
-        
+            
         int p = rows(M);
         int q = cols(M);
         matrix[q, q] MT_M;
         matrix[q, q] backward_V;
         matrix[q, q] V;
-         
-        if(p == 1 && q == 1) {
-             V[1, 1] = 1;
-         } else {
-            // The eigenvectors_sym function returns a matrix with the (column)
-            // eigenvectors of a symmetric matrix in the same order as the
-            // eigenvalues returned by eigenvalues_sym
-            MT_M = M' * M;
-            backward_V = eigenvectors_sym(MT_M);
-
-            // Reverse the order of the  eigenvectors to match that the order of
-            // the eigenvalues returned by eigenvalues_sym
-            for(i in 1:q){
-                V[, i] = backward_V[, q-i+1];
-            }
-         }
+            
+        // The eigenvectors_sym function returns a matrix with the (column)
+        // eigenvectors of a symmetric matrix in the same order as the
+        // eigenvalues returned by eigenvalues_sym
+        MT_M = M' * M;
+        backward_V = eigenvectors_sym(MT_M);
+        
+        
+        // Reverse the order of the  eigenvectors to match that the order of
+        // the eigenvalues returned by eigenvalues_sym
+        for(i in 1:q){
+            V[, i] = backward_V[, q-i+1];
+        }
         
         return V;
+    }
+    
+    matrix U_svd(matrix M, matrix V, matrix D) {
+        // Singular Value Decomposition M = UDV'
+        // M is an p x q martix
+        // U is an p × p orthogonal matrix whose columns are the 
+        // eigenvectors of M'M 
+            
+        int p = rows(M);
+        int q = cols(M);
+        int r = min(p, q);
+        matrix[p, p] U = diag_matrix(rep_vector(1, p));
+        real sing_value;
+        
+        for(i in 1:p) {
+            if(i <= r) {
+                sing_value = D[i,i];
+                if(sing_value > 0){
+                    U[, i] = (1/sing_value) * M * V[, i];
+                }
+            }
+        }
+        
+        return U;
+    }
+    
+    matrix sqrt_svd(matrix M) {
+        // Function to calculate sqrt of covariance matrix using SVD
+        // where the sqrt of a matrix is M^(1/2) such that
+        // M = M^(1/2) * M^(1/2)
+        
+        int p = rows(M);
+        int q = cols(M);
+        matrix[q, q] V;
+        matrix[p, q] D;
+        matrix[p, q] S;
+        matrix[p, p] U;
+        matrix[p, p] N; // square root of M;
+        
+        if(p != q) {
+            reject("Attempting to take square root of ", 
+            "non-square matix using SVD");
+        }
+        
+        V = V_svd(M);
+        D = D_svd(M);
+        U = U_svd(M, V, D);
+        S = sqrt(D);        
+        
+        N = S * V';
+        
+        return(N);
     }
     
     matrix make_MR(matrix D_C, matrix U_C, matrix GG, matrix N_W, int P) {
