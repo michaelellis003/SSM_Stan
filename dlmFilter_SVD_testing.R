@@ -20,6 +20,13 @@ mod1 <- dlmModPoly(
     dW = 755
 )
 
+NileFilt <- dlmFilter( 
+    Nile,
+    mod1
+)
+
+dat[, mod1_filtered := NileFilt$m[-1]]
+
 # fit using Stan
 stan_args <- list( 
     N = nrow(dat),    # Number of observations
@@ -39,9 +46,8 @@ stan_args <- list(
     C0 = mod1$C0        # Initial state vector prior variance-covariance matix
 )
 
-
 mod1_Stan <- stan( 
-    file = "Stan/dlmFilter_SVD.Stan",
+    file = "Stan/univariate_dlmFilter_SVD.stan",
     data = stan_args,
     chains = 1,
     iter = 1,
@@ -49,3 +55,12 @@ mod1_Stan <- stan(
     algorithm = "Fixed_param",
     cores = 1
 )
+
+dat[, mod1_stan_filtered := as.vector(unlist(extract(mod1_Stan, pars = "m")))[-1]]
+
+ggplot(dat) + 
+    geom_point(aes(x = Year, y = y)) + 
+    geom_line(aes(x = Year, y = mod1_filtered, color = "Model 1 - DLM")) + 
+    geom_line(aes(x = Year, y = mod1_stan_filtered, color = "Model 1 - Stan")) + 
+    theme_minimal() + 
+    ylab("Nile")

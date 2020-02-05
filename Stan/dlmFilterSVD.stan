@@ -12,27 +12,35 @@ TO DO: Add handling of missing values
 */
 functions {
         
-    matrix D_svd(matrix M, int nrow, int ncol) {
+    matrix D_svd(matrix M) {
+        // M is an p x q martix
         // Singular Value Decomposition M = UDV'
-        // D is a nrow × ncol diagonal matrix where the first r diagonal 
+        // D is a p × q diagonal matrix where the first r diagonal 
         // entries are the square roots of the eigenvalues of M'M in
         // decreasing order and all other entires are zero
-    
-        matrix[ncol, ncol] MT_M;
-        vector[ncol] MT_M_eigenvalues;
-        matrix[nrow, ncol] D = rep_matrix(0, nrow, ncol);
-    
-        // The eigenvalues_sym funciton returns a vector of eigenvalues 
-        // of a symmetric matrix A in ascending order.
-        MT_M = M' * M;
-        MT_M_eigenvalues = eigenvalues_sym(MT_M);
-    
-        // Insert the eigenvalues in decreasing order.
-        // largest eigenvalue in ncol
-        for(i in 1:nrow) {
-            for(j in 1:ncol) {
-                if(i == j){
-                    D[i, j] = sqrt(MT_M_eigenvalues[ncol-j+1]);
+        
+        int p = rows(M);
+        int q = cols(M);
+        int r = min(p, q);
+        matrix[p, q] D = rep_matrix(0, p, q);
+        vector[q] MT_M_eigenvalues;
+            
+        if(p == 1 && q == 1) {
+            // scalar
+            D[1, 1] = fabs(M[1, 1]);
+
+        } else {
+
+            // The eigenvalues_sym funciton returns a vector of eigenvalues
+            // of a symmetric matrix A in ascending order.
+            MT_M_eigenvalues = eigenvalues_sym( M' * M);
+
+            // Insert the q eigenvalues in decreasing order.
+            // largest eigenvalue in q
+            for(i in 1:r) {
+                real value = MT_M_eigenvalues[q-i+1];
+                if(value >= 0) {
+                    D[i, i] = sqrt(value);
                 }
             }
         }
@@ -40,50 +48,68 @@ functions {
         return D;
     }
     
-    matrix U_svd(matrix M, int nrow, int ncol) {
+    matrix U_svd(matrix M) {
+        // M is an p x q martix
         // Singular Value Decomposition M = UDV'
-        // U is an nrow × nrow orthogonal matrix whose columns are the 
+        // U is a p × p orthogonal matrix whose columns are the 
         // eigenvectors of MM'
         
-        matrix[nrow, nrow] M_MT;
-        matrix[nrow, nrow] backward_U;
-        matrix[nrow, nrow] U;
+        int p = rows(M);
+        int q = cols(M);
+        matrix[p, p] M_MT;
+        matrix[p, p] backward_U;
+        matrix[p, p] U;
         
-        // The eigenvectors_sym function returns a matrix with the (column) 
-        // eigenvectors of a symmetric matrix in the same order as the eigenvalues
-        // returned by eigenvalues_sym
-        M_MT = M * M';
-        backward_U = eigenvectors_sym(M_MT);
-        
-        // Reverse the order of the  eigenvectors to match that the order of
-        // the eigenvalues returned by eigenvalues_sym
-        for(i in 1:nrow){
-            U[, i] = backward_U[, nrow-i+1];
-        }
+         if(p == 1 && q == 1) {
+             if(M[1, 1] < 0) {
+                 U[1, 1] = -1;
+             } else {
+                 U[1, 1] = 1;
+             }
+         } else {
+            // The eigenvectors_sym function returns a matrix with the (column)
+            // eigenvectors of a symmetric matrix in the same order as the
+            // eigenvalue returned by eigenvalues_sym
+            M_MT = M * M';
+            backward_U = eigenvectors_sym(M_MT);
+
+            // Reverse the order of the  eigenvectors to match that the order of
+            // the eigenvalues returned by eigenvalues_sym
+            for(i in 1:p){
+                U[, i] = backward_U[, p-i+1];
+            }
+         }
         
         return U;
     }
     
-    matrix V_svd(matrix M, int nrow, int ncol) {
+    matrix V_svd(matrix M) {
         // Singular Value Decomposition M = UDV'
-        // V is an ncol × ncol orthogonal matrix whose columns are the 
-        // eigenvectors of M'M
+        // M is an p x q martix
+        // V is an q × q orthogonal matrix whose columns are the 
+        // eigenvectors of M'M 
         
-        matrix[ncol, ncol] MT_M;
-        matrix[ncol, ncol] backward_V;
-        matrix[ncol, ncol] V;
-        
-        // The eigenvectors_sym function returns a matrix with the (column) 
-        // eigenvectors of a symmetric matrix in the same order as the eigenvalues
-        // returned by eigenvalues_sym
-        MT_M = M' * M;
-        backward_V = eigenvectors_sym(MT_M);
-        
-        // Reverse the order of the  eigenvectors to match that the order of
-        // the eigenvalues returned by eigenvalues_sym
-        for(i in 1:ncol){
-            V[, i] = backward_V[, ncol-i+1];
-        }
+        int p = rows(M);
+        int q = cols(M);
+        matrix[q, q] MT_M;
+        matrix[q, q] backward_V;
+        matrix[q, q] V;
+         
+        if(p == 1 && q == 1) {
+             V[1, 1] = 1;
+         } else {
+            // The eigenvectors_sym function returns a matrix with the (column)
+            // eigenvectors of a symmetric matrix in the same order as the
+            // eigenvalues returned by eigenvalues_sym
+            MT_M = M' * M;
+            backward_V = eigenvectors_sym(MT_M);
+
+            // Reverse the order of the  eigenvectors to match that the order of
+            // the eigenvalues returned by eigenvalues_sym
+            for(i in 1:q){
+                V[, i] = backward_V[, q-i+1];
+            }
+         }
         
         return V;
     }
@@ -111,10 +137,8 @@ functions {
         matrix[M, P] MC_top;
         matrix[P, P] MC_bottom;
         
-        print(D_R);
-        print(sqrt(D_R));
-        S_R_inv = 1 ./ sqrt(D_R);
-        print(S_R_inv);
+        
+        S_R_inv =  diag_matrix(1 ./ sqrt(diagonal(D_R)));
         MC_top = N_V * FF * U_R;
         MC_bottom = S_R_inv;
         
@@ -166,7 +190,7 @@ generated quantities {
     // state t given all observations through time t
     vector[M] err[N];
     vector[P] m[N+1];
-    cov_matrix[P] C[N+1];
+    matrix[P, P] C[N+1];
     matrix[P, P] U_C[N+1];
     matrix[P, P] D_C[N+1];
     matrix[P+M, M] M_C[N];          // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
@@ -176,13 +200,13 @@ generated quantities {
     
     // Stuff for square root of W
     matrix[M, M] N_W;
-    matrix[M, M] U_W = U_svd(W, M, M);
-    matrix[M, M] S_W = sqrt(D_svd(W, M, M));
+    matrix[M, M] U_W = U_svd(W);
+    matrix[M, M] S_W = sqrt(D_svd(W));
     
     // Stuff for square root of V^-1
     matrix[P, P] N_V;
-    matrix[P, P] U_V = U_svd(V, P, P);
-    matrix[P, P] S_V = sqrt(D_svd(V, P, P));
+    matrix[P, P] U_V = U_svd(V);
+    matrix[P, P] S_V = sqrt(D_svd(V));
     
     // Get square root of W and V^-1
     N_W = S_W * U_W';
@@ -191,15 +215,15 @@ generated quantities {
     // Kalman filter
     // Intialize
     m[1] = m0;
-    U_C[1] = U_svd(C0, P, P);
-    D_C[1] = D_svd(C0, P, P);
+    U_C[1] = U_svd(C0);
+    D_C[1] = D_svd(C0);
     
     for(n in 1:N) {
         a[n] = GG * m[n];
         M_R[n] = make_MR(D_C[n], U_C[n], GG, N_W, P);
         R[n] = M_R[n]' * M_R[n];
-        U_R[n] = V_svd(M_R[n], 2*P, P);
-        D_R[n] = D_svd(M_R[n], 2*P, P);
+        U_R[n] = V_svd(M_R[n]);
+        D_R[n] = D_svd(M_R[n]);
         
         f[n] = FF * a[n];
         Q[n] = FF * R[n] * FF' + V;
@@ -209,12 +233,14 @@ generated quantities {
         m[n+1] = a[n] + R[n] * FF' * Q_inv[n] * err[n];
         
         M_C[n] = make_MC(N_V, FF, U_R[n], D_R[n], M, P);
-        V_M_C = V_svd(M_C[n], P+M, P);
-        D_M_C = D_svd(M_C[n], P+M, P);
+        V_M_C = V_svd(M_C[n]);
+        D_M_C = D_svd(M_C[n]);
         
         U_C[n+1] = U_R[n] * V_M_C;
-        D_C[n+1] = 1 ./ (D_M_C .* D_M_C);
+        D_C[n+1] = diag_matrix(1 ./ diagonal(D_M_C .* D_M_C));
         
         C[n+1] = U_C[n+1] * D_C[n+1] * U_C[n+1]';
+        print(n+1);
+        print(C[n+1]);
     }
 }
