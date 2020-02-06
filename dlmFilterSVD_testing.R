@@ -13,23 +13,15 @@ ggplot(dat, aes(x = Year, y = y)) +
     theme_minimal() + 
     ylab("Nile")
 
-# build model using dlm
 mod1 <- dlmModPoly( 
     order = 1,
     dV = 15100,
     dW = 755
 )
 
-NileFilt <- dlmFilter( 
-    Nile,
-    mod1
-)
-
-dat[, mod1_filtered := NileFilt$m[-1]]
-
-# fit using Stan
+# build and fit model using stan -----------------------------------------------
 stan_args <- list( 
-    N = nrow(dat),    # Number of observations
+    N = nrow(dat),          # Number of observations
     M = 1,            # Dimension of observation
     P = 1,            # Dimension of state vector
     
@@ -47,7 +39,7 @@ stan_args <- list(
 )
 
 mod1_Stan <- stan( 
-    file = "Stan/univariate_dlmFilter_SVD.stan",
+    file = "Stan/dlmFilterSVD.stan",
     data = stan_args,
     chains = 1,
     iter = 1,
@@ -58,9 +50,20 @@ mod1_Stan <- stan(
 
 dat[, mod1_stan_filtered := as.vector(unlist(extract(mod1_Stan, pars = "m")))[-1]]
 
+# build and model using dlm ----------------------------------------------------
+
+NileFilt <- dlmFilter( 
+    Nile,
+    mod1
+)
+
+dat[, mod1_filtered := NileFilt$m[-1]]
+
+# plot and compare -------------------------------------------------------------
+
 ggplot(dat) + 
     geom_point(aes(x = Year, y = y)) + 
     geom_line(aes(x = Year, y = mod1_filtered, color = "Model 1 - DLM")) + 
-    geom_line(aes(x = Year, y = mod1_stan_filtered, color = "Model 1 - Stan")) + 
+    geom_line(aes(x = Year, y = mod1_stan_filtered, color = "Model 1 - Stan"), linetype="dashed") + 
     theme_minimal() + 
     ylab("Nile")
