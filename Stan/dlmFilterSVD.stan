@@ -12,13 +12,17 @@ TO DO: Add handling of missing values
 */
 functions {
     
-    matrix D_svd(matrix M, int invert) {
-        // M is an p x q martix
-        // Singular Value Decomposition M = UDV'
-        // D is a p × q diagonal matrix where the first r diagonal 
-        // entries are the square roots of the eigenvalues of M'M in
-        // decreasing order and all other entires are zero
-        // if in invert = 1 then return D^-1
+        matrix D_svd(matrix M, int invert) {
+        /* 
+        INPUT:
+        - M is an p x q martix. M = UDV'
+        - invert = 0 or invert = 1
+        OUTPUT:
+        - Function returns "D" matrix of singular value decomposition (SVD)
+        - If invert = 1 then return D_inv where D_inv[i,i] = 1/D[i,i]
+        - D is a p × q diagonal matrix where the first r diagonal 
+            entries are the square roots of the eigenvalues of M'M in
+            decreasing order and all other entires are zero */
         
         int p = rows(M);
         int q = cols(M);
@@ -49,6 +53,26 @@ functions {
         }
                                                 
         return D;
+    }
+    
+    matrix Dinv_svd(matrix D) {
+        // M is an p x q martix
+        // Singular Value Decomposition M = UDV'
+        // return D_inv where D_inv[i,i] = 1/D[i,i]
+        
+        int p = rows(D);
+        int q = cols(D);
+        int r = min(p, q);
+        matrix[p, q] D_inv = rep_matrix(0, p, q);
+        
+        for(i in 1:r) {
+            real value = D[i, i];
+            if(value >= 0) {
+                D_inv[i, i] = 1/value;
+            }
+        }
+                                                
+        return D_inv;
     }
     
     matrix V_svd(matrix M) {
@@ -157,7 +181,7 @@ functions {
         matrix[m, p] MC_top;
         matrix[p, p] MC_bottom;
         
-        S_R_inv =  1 ./ sqrt(D_R);
+        S_R_inv = sqrt(Dinv_svd(D_R));
         MC_top = N_V * FF * U_R;
         MC_bottom = S_R_inv;
         
@@ -253,7 +277,7 @@ generated quantities {
         err[n] = y[n] - f[n];
         m[n+1] = a[n] + R[n] * FF' * Q_inv[n] * err[n];
         
-        // Issue must start here
+
         M_C[n] = make_MC(N_V, FF, U_R[n], D_R[n]);
         V_M_C = V_svd(M_C[n]);
         D_M_C_inv = D_svd(M_C[n], 1);

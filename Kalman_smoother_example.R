@@ -92,7 +92,7 @@ mod1_Stan <- stan(
     cores = 1
 )
 
-dat[, mod1_stan_filtered := as.vector(unlist(extract(mod1_Stan, pars = "m")))[-1]]
+dat[, mod1_stan_smoothed := as.vector(unlist(extract(mod1_Stan, pars = "s")))[-1]]
 
 # Model 2 in Stan
 stan_args_mod2 <- list( 
@@ -115,8 +115,8 @@ stan_args_mod2 <- list(
 
 
 mod2_Stan <- stan( 
-    file = "Stan/dlmFilter.Stan",
-    data = stan_args,
+    file = "Stan/dlmSmooth.Stan",
+    data = stan_args_mod2,
     chains = 1,
     iter = 1,
     warmup = 0,
@@ -124,14 +124,16 @@ mod2_Stan <- stan(
     cores = 1
 )
 
-dat[, mod2_stan_filtered := as.vector(unlist(extract(mod2_Stan, pars = "m")))[-1]]
+dat[, mod2_stan_smoothed := as.vector(unlist(extract(mod2_Stan, pars = "s")))[-1]]
 
 ggplot(dat) + 
     geom_point(aes(x = Year, y = y)) + 
-    geom_line(aes(x = Year, y = mod1_filtered, color = "Model 1 - DLM")) + 
-    geom_line(aes(x = Year, y = mod2_filtered, color = "Model 2 - DLM")) + 
-    geom_line(aes(x = Year, y = mod1_stan_filtered, color = "Model 1 - Stan"), linetype="dashed") + 
-    geom_line(aes(x = Year, y = mod2_stan_filtered, color = "Model 2 - Stan"), linetype="dashed") + 
+    geom_line(aes(x = Year, y = mod1_smooth, color = "Model 1 - DLM")) + 
+    geom_ribbon(aes(x = Year, ymin = mod1_smooth_lower, ymax = mod1_smooth_upper, fill = "Model 1 - DLM"), alpha = 0.25) + 
+    geom_line(aes(x = Year, y = mod2_smooth, color = "Model 2 - DLM")) + 
+    geom_ribbon(aes(x = Year, ymin = mod2_smooth_lower, ymax = mod2_smooth_upper, fill = "Model 2 - DLM"), alpha = 0.25) +
+    geom_line(aes(x = Year, y = mod1_stan_smoothed, color = "Model 1 - Stan"), linetype="dashed") + 
+    geom_line(aes(x = Year, y = mod2_stan_smoothed, color = "Model 2 - Stan"), linetype="dashed") + 
     theme_minimal() + 
     ylab("Nile")
 
