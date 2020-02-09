@@ -242,7 +242,20 @@ generated quantities {
     // Stuff for Kalman smoother
     int<lower = 0, upper = N> t;
     vector[P] s[N+1];
+    cov_matrix[P] S[N+1];
+    matrix[P, P] U_S[N+1];
+    matrix[P, P] D_S[N+1];
     matrix[P, P] Dinv_R;
+    matrix[P, P] Dinv_C;
+    matrix[P, P] H;
+    matrix[2*P, P] MS1;
+    matrix[2*P, P] D_MS1;
+    matrix[2*P, P] Dinv_MS1;
+    matrix[P, P] V_MS1;
+    
+    matrix[2*P, P] MS2;
+    matrix[2*P, P] D_MS2;
+    matrix[P, P] V_MS2;
     
     
     // Store square root of W and V^-1
@@ -289,15 +302,37 @@ generated quantities {
     
     // Kalman smooth
     s[N+1] = m[N+1];
-    //U_S[N+1] = U_C[N+1];
-    //D_S[N+1] = D_C[N+1];
-    //S[N+1] = U_S[N+1] * D_S[N+1] * U_S[N+1]';
+    U_S[N+1] = U_C[N+1];
+    D_S[N+1] = D_C[N+1];
+    S[N+1] = U_S[N+1] * D_S[N+1] * U_S[N+1]';
     
     for(n in 1:N){
         t = N - n + 1;
         
+        // mean
         Dinv_R = Dinv_svd(D_R[t]);
-        s[t] = m[t] + C[t] * GG' * (U_R[t] * Dinv_R * U_R[t]') * (s[t+1] - a[t]);
+        H = C[t] * GG' * (U_R[t] * Dinv_R * U_R[t]');
+        s[t] = m[t] + H * (s[t+1] - a[t]);
+        
+        // covariance matrix
+        Dinv_C = Dinv_svd(D_C[t]);
+        N_W = sqrt_svd(inverse(W));
+        MS1 = append_row(N_W * GG, 
+                        sqrt(Dinv_C) * U_C[t]');
+        
+        D_MS1 = D_svd(MS1, 0);
+        Dinv_MS1 = Dinv_svd(D_MS1);
+        V_MS1 = V_svd(MS1);
+        
+        MS2 = append_row(Dinv_MS1[1:P, 1:P] * V_MS1', 
+                        sqrt(D_S[t+1]) * (H * U_S[t+1])');
+        D_MS2 = D_svd(MS2, 0);
+        V_MS2 = V_svd(MS2);
+        
+        U_S[t] = V_MS2;
+        D_S[t] = D_MS2' * D_MS2;
+        S[t] = U_S[t] * D_S[t] * U_S[t]';
+        
     }
     
 }

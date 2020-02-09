@@ -13,39 +13,19 @@ ggplot(dat, aes(x = Year, y = y)) +
     theme_minimal() + 
     ylab("Nile")
 
-# Filter using functions in dlm package
+# Model 1 filter using functions in dlm package
 mod1 <- dlmModPoly( 
     order = 1,
     dV = 15100,
     dW = 755
 )
 
-mod2 <- dlmModPoly( 
-    order = 1,
-    dV = 15100,
-    dW = 7550
-)
-
-NileFilt <- dlmFilter( 
+NileFilt1 <- dlmFilter( 
     Nile,
     mod1
 )
 
-dat[, mod1_filtered := NileFilt$m[-1]]
-
-NileFilt <- dlmFilter( 
-    Nile,
-    mod2
-)
-
-dat[, mod2_filtered := NileFilt$m[-1]]
-
-ggplot(dat) + 
-    geom_point(aes(x = Year, y = y)) + 
-    geom_line(aes(x = Year, y = mod1_filtered, color = "Model 1")) + 
-    geom_line(aes(x = Year, y = mod2_filtered, color = "Model 2")) + 
-    theme_minimal() + 
-    ylab("Nile")
+dat[, mod1_filtered := NileFilt1$m[-1]]
 
 # Model 1 in Stan
 stan_args <- list( 
@@ -67,7 +47,7 @@ stan_args <- list(
 )
 
 mod1_Stan <- stan( 
-    file = "Stan/dlmFilterSVD.stan",
+    file = "Stan/dlmFilter.stan",
     data = stan_args,
     chains = 1,
     iter = 1,
@@ -77,6 +57,40 @@ mod1_Stan <- stan(
 )
 
 dat[, mod1_stan_filtered := as.vector(unlist(extract(mod1_Stan, pars = "m")))[-1]]
+
+## compare parameter estimates
+as.vector(unlist(extract(mod1_Stan, pars = "m")))
+as.vector(unlist(NileFilt1$m))
+
+as.vector(unlist(extract(mod1_Stan, pars = "U_C")))
+as.vector(unlist(NileFilt1$U.C))
+
+sqrt(as.vector(unlist(extract(mod1_Stan, pars = "D_C"))))
+as.vector(unlist(NileFilt1$D.C))
+
+sqrt(as.vector(unlist(extract(mod1_Stan, pars = "U_R"))))
+as.vector(unlist(NileFilt1$U.R))
+
+sqrt(as.vector(unlist(extract(mod1_Stan, pars = "D_R"))))
+as.vector(unlist(NileFilt1$D.R))
+
+as.vector(unlist(extract(mod1_Stan, pars = "a")))
+as.vector(unlist(NileFilt1$a))
+
+
+# Model 2 in dlm
+mod2 <- dlmModPoly( 
+    order = 1,
+    dV = 15100,
+    dW = 7550
+)
+
+NileFilt2 <- dlmFilter( 
+    Nile,
+    mod2
+)
+
+dat[, mod2_filtered := NileFilt2$m[-1]]
 
 # Model 2 in Stan
 stan_args <- list( 
@@ -99,7 +113,7 @@ stan_args <- list(
 
 
 mod2_Stan <- stan( 
-    file = "Stan/dlmFilterSVD.stan",
+    file = "Stan/dlmFilter.stan",
     data = stan_args,
     chains = 1,
     iter = 1,

@@ -81,7 +81,6 @@ stan_args_mod1 <- list(
     C0 = mod1$C0        # Initial state vector prior variance-covariance matix
 )
 
-
 mod1_Stan <- stan( 
     file = "Stan/dlmSmooth.stan",
     data = stan_args_mod1,
@@ -92,7 +91,12 @@ mod1_Stan <- stan(
     cores = 1
 )
 
-dat[, mod1_stan_smoothed := as.vector(unlist(extract(mod1_Stan, pars = "s")))[-1]]
+hwid_mod1 <- qnorm(0.025, lower = FALSE) * sqrt(as.vector(unlist(extract(mod1_Stan, pars = "S"))))
+dat[, ':='( 
+    mod1_stan_smoothed = as.vector(unlist(extract(mod1_Stan, pars = "s")))[-1],
+    mod1_stan_smooth_upper = as.vector(unlist(extract(mod1_Stan, pars = "s")))[-1] + hwid_mod1[-1],
+    mod1_stan_smooth_lower = as.vector(unlist(extract(mod1_Stan, pars = "s")))[-1] - hwid_mod1[-1]
+)]
 
 # Model 2 in Stan
 stan_args_mod2 <- list( 
@@ -113,7 +117,6 @@ stan_args_mod2 <- list(
     C0 = mod2$C0        # Initial state vector prior variance-covariance matix
 )
 
-
 mod2_Stan <- stan( 
     file = "Stan/dlmSmooth.Stan",
     data = stan_args_mod2,
@@ -124,7 +127,12 @@ mod2_Stan <- stan(
     cores = 1
 )
 
-dat[, mod2_stan_smoothed := as.vector(unlist(extract(mod2_Stan, pars = "s")))[-1]]
+hwid_mod2 <- qnorm(0.025, lower = FALSE) * sqrt(as.vector(unlist(extract(mod2_Stan, pars = "S"))))
+dat[, ':='( 
+    mod2_stan_smoothed = as.vector(unlist(extract(mod2_Stan, pars = "s")))[-1],
+    mod2_stan_smooth_upper = as.vector(unlist(extract(mod2_Stan, pars = "s")))[-1] + hwid_mod2[-1],
+    mod2_stan_smooth_lower =as.vector(unlist(extract(mod2_Stan, pars = "s")))[-1] - hwid_mod2[-1]
+)]
 
 ggplot(dat) + 
     geom_point(aes(x = Year, y = y)) + 
@@ -133,7 +141,9 @@ ggplot(dat) +
     geom_line(aes(x = Year, y = mod2_smooth, color = "Model 2 - DLM")) + 
     geom_ribbon(aes(x = Year, ymin = mod2_smooth_lower, ymax = mod2_smooth_upper, fill = "Model 2 - DLM"), alpha = 0.25) +
     geom_line(aes(x = Year, y = mod1_stan_smoothed, color = "Model 1 - Stan"), linetype="dashed") + 
+    geom_ribbon(aes(x = Year, ymin = mod1_stan_smooth_lower, ymax = mod1_stan_smooth_upper, fill = "Model 1 - Stan"), alpha = 0.25) +
     geom_line(aes(x = Year, y = mod2_stan_smoothed, color = "Model 2 - Stan"), linetype="dashed") + 
+    geom_ribbon(aes(x = Year, ymin = mod2_stan_smooth_lower, ymax = mod2_stan_smooth_upper, fill = "Model 2 - Stan"), alpha = 0.25) +
     theme_minimal() + 
     ylab("Nile")
 
