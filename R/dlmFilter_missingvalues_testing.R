@@ -5,6 +5,14 @@ library(rstan)
 y <- matrix(0, nrow = length(Nile), ncol = 2)
 y[, 1] <- y[, 2] <- as.vector(Nile)
 
+rand_rows_case1 <- sample(nrow(y), size = 3)
+y[rand_rows_case1, 1:ncol(y)] <- NA
+
+rand_rows_case2 <- sample(nrow(y), size = 2)
+rand_cols_case2 <- sample(ncol(y), size = 2)
+y[rand_rows_case2[1], rand_cols_case2[1]] <- NA
+y[rand_rows_case2[2], rand_cols_case2[2]] <- NA
+
 dat <- data.table( 
     y1 = y[, 1],
     y2 = y[, 2],
@@ -46,6 +54,17 @@ dat[,
     ]
 
 # Model 1 in Stan
+y_missing <- matrix(0, nrow = nrow(y), ncol = ncol(y))
+
+y[rand_rows_case1, 1:ncol(y)] <- Inf
+y_missing[rand_rows_case1, 1:ncol(y)] <- 1
+
+y[rand_rows_case2[1], rand_cols_case2[1]] <- Inf
+y[rand_rows_case2[2], rand_cols_case2[2]] <- Inf
+y_missing[rand_rows_case2[1], rand_cols_case2[1]] <- 1
+y_missing[rand_rows_case2[2], rand_cols_case2[2]] <- 1
+num_missing <- rowSums(y_missing)
+
 stan_args <- list( 
     N = nrow(y),    # Number of observations
     M = ncol(y),            # Dimension of observation
@@ -53,6 +72,8 @@ stan_args <- list(
     
     # Observation Stuff
     y = y,         # Observations
+    y_missing = y_missing,
+    num_missing = num_missing,
     FF = mod$FF,      # Observation equation matrix
     V = mod$V,        # Known constant covariance matix for observation equation
     
@@ -65,7 +86,7 @@ stan_args <- list(
 )
 
 mod1_Stan <- stan( 
-    file = "Stan/dlmFilter.stan",
+    file = "Stan/dlmFilter_missingvalues.stan",
     data = stan_args,
     chains = 1,
     iter = 1,

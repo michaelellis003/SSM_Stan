@@ -222,30 +222,28 @@ generated quantities {
     matrix[P, P] U_R[N];
     matrix[P, P] D_R[N];
     matrix[2*P, P] sqrt_D_R;
-    matrix[2*M, M] M_R[N];      // M_R[n]' * M_R[n] = R[n]
+    matrix[2*P, P] M_R;      // M_R[n]' * M_R[n] = R[n]
     
     // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
     // distribution of observation t given all observations through time t-1
     vector[M] f[N];
     cov_matrix[M] Q[N];
-    matrix[M, M] Q_inv[N];
+    matrix[M, M] Q_inv;
     
     // mean and variance-covariance matix for filtering distribution of
     // state t given all observations through time t
-    vector[M] err[N];
     vector[P] m[N+1];
     cov_matrix[P] C[N+1];
-    matrix[P, P] V_C_0;
     matrix[P, P] U_C[N+1];
     matrix[P, P] D_C[N+1];
-    matrix[P+M, M] M_C[N];      // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
-    matrix[M, M] V_M_C;
-    matrix[P+M, M] D_M_C_inv;
+    matrix[P+M, P] M_C;      // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
+    matrix[P, P] V_M_C;
+    matrix[P+M, P] Dinv_M_C;
     
     // Store square root of W and V^-1
-    matrix[M, M] N_W ;
-    matrix[P, P] V_inv;
-    matrix[P, P] N_V;
+    matrix[P, P] N_W ;
+    matrix[M, M] V_inv;
+    matrix[M, M] N_V;
     
     // Get square root of W using SVD
     N_W = sqrt_svd(W);
@@ -258,32 +256,30 @@ generated quantities {
     // Intialize
     m[1] = m0;
     C[1] = C0;
-    V_C_0 = V_svd(C0);
     D_C[1] = D_svd(C0, 0);
-    U_C[1] = U_svd(C0, V_C_0, D_C[1]);
+    U_C[1] = V_svd(C0)';
 
     for(n in 1:N) {
         a[n] = GG * m[n];
-        M_R[n] = make_MR(D_C[n], U_C[n], GG, N_W);
-        R[n] = M_R[n]' * M_R[n];
-        U_R[n] = V_svd(M_R[n]);
-        sqrt_D_R = D_svd(M_R[n], 0);
+        M_R = make_MR(D_C[n], U_C[n], GG, N_W);
+        R[n] = M_R' * M_R;
+        U_R[n] = V_svd(M_R);
+        sqrt_D_R = D_svd(M_R, 0);
         D_R[n] = sqrt_D_R' * sqrt_D_R;
 
         f[n] = FF * a[n];
         Q[n] = FF * R[n] * FF' + V;
 
-        Q_inv[n] = inverse(Q[n]);
-        err[n] = y[n] - f[n];
-        m[n+1] = a[n] + R[n] * FF' * Q_inv[n] * err[n];
+        Q_inv = inverse(Q[n]);
+        m[n+1] = a[n] + R[n] * FF' * Q_inv * (y[n] - f[n]);
         
 
-        M_C[n] = make_MC(N_V, FF, U_R[n], D_R[n]);
-        V_M_C = V_svd(M_C[n]);
-        D_M_C_inv = D_svd(M_C[n], 1);
+        M_C = make_MC(N_V, FF, U_R[n], D_R[n]);
+        V_M_C = V_svd(M_C);
+        Dinv_M_C = D_svd(M_C, 1);
         
         U_C[n+1] = U_R[n] * V_M_C;
-        D_C[n+1] = D_M_C_inv' * D_M_C_inv;
+        D_C[n+1] = Dinv_M_C' * Dinv_M_C;
 
         C[n+1] = U_C[n+1] * D_C[n+1] * U_C[n+1]';
     }
