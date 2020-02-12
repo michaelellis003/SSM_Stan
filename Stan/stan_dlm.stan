@@ -1,16 +1,7 @@
 /*
-Implement Kalman filter for multivariate Dynamic Linear Model with
-known and constant covariance matices for the observation equation 
-and the state transition equation. - See Chapter 2.7 of Dynamic Linear Models 
-with R - Petris et. al.
-
-Uses singular value decomposition to avoid numerical in instability when
-updating filtering distribution covariance matrix - Appendix B of Dynamic Linear 
-Models  with R - Petris et. al.
 */
 functions {
-    
-        matrix D_svd(matrix M, int invert) {
+    matrix D_svd(matrix M, int invert) {
         /* 
         INPUT:
         - M is an p x q martix. M = UDV'
@@ -188,156 +179,120 @@ functions {
     
         return MC;
     }
-    
 }
 data {
     int<lower=1> N;         // Number of observations
     int<lower=1> M;         // Dimension of observation
     int<lower=1> P;         // Dimension of state vector
     
-    // Observation Stuff
-    vector[M] y[N];                             // Observations
+    vector[M] y[N];         // Observations
     vector<lower=0, upper=1>[M] y_missing[N];   // Locations of missing observations. 1 if missing, 0 otherwise
-    int<lower=0, upper=M> num_missing[N];       // Numer of missing observations in row
-    matrix[M, P] FF;                            // Observation equation matrix
-    cov_matrix[M] V;                            // Known constant covariance matix for observation equation
-    
-    // State Stuff
+    int<lower=0, upper=M> num_missing[N]; 
+    matrix[M, P] FF;        // Observation equation matrix
     matrix[P, P] GG;        // State/transition equation matrix
-    cov_matrix[P] W;        // Known constant covariance matix for state transition equation
     
     vector[P] m0;           // Initial state vector prior mean
     matrix[P, P] C0;        // Initial state vector prior variance-covariance matix
 }
 parameters {
+    cholesky_factor_corr[M] V_L_Omega;
+    vector<lower=0,upper=pi()/2>[M] V_tau_unif;
+    
+    cholesky_factor_corr[P] W_L_Omega;
+    vector<lower=0,upper=pi()/2>[P] W_tau_unif;
 }
 transformed parameters {
+    vector<lower=0>[M] V_tau;
+    vector<lower=0>[P] W_tau;
+    cov_matrix[M] V;
+    cov_matrix[P] W;
+    
+    for(i in 1:M){
+        V_tau[i] = 2.5 * tan(V_tau_unif[i]);
+    }
+    for(p in 1:P){
+        W_tau[p] = 2.5 * tan(W_tau_unif[p]);
+    }
+    
+    V = diag_pre_multiply(V_tau, V_L_Omega) * diag_pre_multiply(V_tau, V_L_Omega)';
+    W = diag_pre_multiply(W_tau, W_L_Omega) * diag_pre_multiply(W_tau, W_L_Omega)';
 }
 model {
-}
-generated quantities {
-    // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
-    // distribution of state t given all observations through time t-1
-    vector[P] a[N];
-    cov_matrix[P] R[N];
-    matrix[P, P] U_R[N];
-    matrix[P, P] D_R[N];
+    real log_lik_obs[N];
+    real log_lik;
+    V_L_Omega ~ lkj_corr_cholesky(2);
+    W_L_Omega ~ lkj_corr_cholesky(2);
     
-    // mean and variance-covariance matix for one-step-ahead (Gaussian) predictive
-    // distribution of observation t given all observations through time t-1
-    vector[M] f[N];
-    cov_matrix[M] Q[N];
-    
-    // mean and variance-covariance matix for filtering distribution of
-    // state t given all observations through time t
-    vector[P] m[N+1];
-    cov_matrix[P] C[N+1];
-    matrix[P, P] U_C[N+1];
-    matrix[P, P] D_C[N+1];
-    
-    // Store square root of W and V^-1
-    matrix[P, P] N_W ;
-    matrix[M, M] V_inv;
-    matrix[M, M] N_V;
-    
-    // Get square root of W using SVD
-    N_W = sqrt_svd(W);
-    
-    // Get square root of V^-1
-    V_inv = inverse(V);
-    N_V = sqrt_svd(V_inv);
-    
-    // Kalman filter
-    // Intialize
-    m[1] = m0;
-    C[1] = C0;
-    D_C[1] = D_svd(C0, 0);
-    U_C[1] = V_svd(C0)';
-
-    for(n in 1:N) {
-        // local variables
-        matrix[2*P, P] sqrt_D_R;
-        matrix[2*P, P] M_R;      // M_R[n]' * M_R[n] = R[n]
-        matrix[P+M, P] M_C;      // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
-        matrix[P, P] V_M_C;
-        matrix[P+M, P] Dinv_M_C;
-        matrix[M, M] Q_inv;
-        int num_miss = num_missing[n];
+    {
+        vector[P] a;
+        matrix[P, P] R;
+        vector[M] f;
+        matrix[M, M] Q;
+        matrix[M, M] Qinv;
+        vector[P] m[N+1];
+        matrix[P, P] C[N+1];
+        matrix[P, P] U_C[N+1];
+        matrix[P, P] D_C[N+1];
         
-        a[n] = GG * m[n];
-        M_R = make_MR(D_C[n], U_C[n], GG, N_W);
-        R[n] = M_R' * M_R;
-        U_R[n] = V_svd(M_R);
-        sqrt_D_R = D_svd(M_R, 0);
-        D_R[n] = sqrt_D_R' * sqrt_D_R;
-
-        f[n] = FF * a[n];
-        Q[n] = FF * R[n] * FF' + V;
+        // Store square root of W and V^-1
+        matrix[P, P] N_W ;
+        matrix[M, M] V_inv;
+        matrix[M, M] N_V;
+    
+        // Get square root of W using SVD
+        N_W = sqrt_svd(W);
+    
+        // Get square root of V^-1
+        V_inv = inverse(V);
+        N_V = sqrt_svd(V_inv);
         
-        if(num_miss == M) {
-            // All observations in a row are missing
-            m[n+1] = a[n];
-            U_C[n+1] = U_R[n];
-            D_C[n+1] = D_R[n];
-            C[n+1] = U_C[n+1] * D_C[n+1] * U_C[n+1]';
-            
-        } else if(num_miss > 0 && num_miss < M) {
-            // Some but not all observations in a row are missing
-            int M_tilde = M - num_missing[n];  // let M_tilde be number of non-missing observations
-            matrix[M_tilde, M] Mt = rep_matrix(0, M_tilde, M);
-            vector[M_tilde] f_tilde;
-            matrix[M_tilde, M_tilde] Q_tilde;
-            matrix[M_tilde, M_tilde] Qinv_tilde;
-            matrix[P+M_tilde, P] M_C_tilde;
-            matrix[P+M_tilde, P] Dinv_M_C_tilde;
-            matrix[M_tilde, M_tilde] V_tilde;
-            matrix[M_tilde, M_tilde] Vinv_tilde;
-            matrix[M_tilde, M_tilde] N_V_tilde;
-            matrix[M_tilde, P] FF_tilde;
-            vector[M_tilde] y_tilde;
-            int i_tilde = 1;
-            
-            for(i in 1:M){
-                if(y_missing[n][i] == 0){
-                   Mt[i_tilde, i] = 1;
-                   y_tilde[i_tilde] = y[n][i];
-                   i_tilde = i_tilde+1;
-                }
-            }
-            
-            FF_tilde = Mt * FF;
-            V_tilde = Mt * V * Mt';
-            
-            f_tilde = FF_tilde * a[n];
-            Q_tilde = FF_tilde * R[n] * FF_tilde' + V_tilde;
-            Qinv_tilde = inverse(Q_tilde);
-            
-            m[n+1] = a[n] + R[n] * FF_tilde' * Qinv_tilde * (y_tilde - f_tilde);
-            
-            // get inverse of V_tilde
-            Vinv_tilde = inverse(V_tilde);
-            N_V_tilde = sqrt_svd(Vinv_tilde);
-            
-            M_C_tilde = make_MC(N_V_tilde, FF_tilde, U_R[n], D_R[n]);
-            V_M_C = V_svd(M_C_tilde);
-            Dinv_M_C_tilde = D_svd(M_C_tilde, 1);
+        // Kalman filter
+        // Intialize
+        m[1] = m0;
+        C[1] = C0;
+        D_C[1] = D_svd(C0, 0);
+        U_C[1] = V_svd(C0)';
         
-            U_C[n+1] = U_R[n] * V_M_C;
-            D_C[n+1] = Dinv_M_C_tilde' * Dinv_M_C_tilde;
-            C[n+1] = U_C[n+1] * D_C[n+1] * U_C[n+1]';
+        for(t in 1:N){
+            matrix[2*P, P] M_R;                     // M_R[n]' * M_R[n] = R[n]
+            matrix[P, P] U_R;
+            matrix[P, P] D_R;
+            matrix[2*P, P] sqrt_D_R;
             
-        } else {
-            // No observations in a row are missing
-            Q_inv = inverse(Q[n]);
-            m[n+1] = a[n] + R[n] * FF' * Q_inv * (y[n] - f[n]);
-        
-            M_C = make_MC(N_V, FF, U_R[n], D_R[n]);
+            vector[M] err;
+            matrix[P+M, P] M_C;      // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
+            matrix[P, P] V_M_C;
+            matrix[P+M, P] Dinv_M_C;
+            
+            a = GG * m[t];
+            M_R = make_MR(D_C[1], U_C[1], GG, N_W);
+            R = M_R' * M_R;                         //R = GG * C[t] * GG' + W;
+            U_R = V_svd(M_R);
+            sqrt_D_R = D_svd(M_R, 0);
+            D_R = sqrt_D_R' * sqrt_D_R;
+            
+            f = FF * a;
+            Q = FF * R * FF' + V;
+            
+            err = y[t] - f;
+            log_lik_obs[t] = multi_normal_lpdf(err | rep_vector(0, M), Q);
+            
+            Qinv = inverse(Q);
+            m[t+1] = a + R * FF' * Qinv * err;
+            
+            M_C = make_MC(N_V, FF, U_R, D_R);
             V_M_C = V_svd(M_C);
             Dinv_M_C = D_svd(M_C, 1);
-        
-            U_C[n+1] = U_R[n] * V_M_C;
-            D_C[n+1] = Dinv_M_C' * Dinv_M_C;
-            C[n+1] = U_C[n+1] * D_C[n+1] * U_C[n+1]';
+            
+            U_C[t+1] = U_R * V_M_C;
+            D_C[t+1] = Dinv_M_C' * Dinv_M_C;
+            C[t+1] = U_C[t+1] * D_C[t+1] * U_C[t+1]';
         }
     }
+        
+    log_lik = sum(log_lik_obs);
+    target += log_lik;
+    //y ~ gaussian_dlm_obs(FF, GG, V, W, m0, C0);
+}
+generated quantities {
 }

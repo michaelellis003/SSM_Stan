@@ -70,6 +70,8 @@ stan_args_mod1 <- list(
     
     # Observation Stuff
     y = matrix(dat$y, nrow = nrow(dat), ncol = 1),         # Observations
+    y_missing = matrix(0, nrow = nrow(dat), ncol = 1),    
+    num_missing = rep(0, nrow(dat)),    
     FF = mod1$FF,      # Observation equation matrix
     V = mod1$V,        # Known constant covariance matix for observation equation
     
@@ -106,6 +108,8 @@ stan_args_mod2 <- list(
     
     # Observation Stuff
     y = matrix(dat$y, nrow = nrow(dat), ncol = 1),         # Observations
+    y_missing = matrix(0, nrow = nrow(dat), ncol = 1),    
+    num_missing = rep(0, nrow(dat)),    
     FF = mod2$FF,      # Observation equation matrix
     V = mod2$V,        # Known constant covariance matix for observation equation
     
@@ -146,9 +150,6 @@ ggplot(dat) +
     geom_ribbon(aes(x = Year, ymin = mod2_stan_smooth_lower, ymax = mod2_stan_smooth_upper, fill = "Model 2 - Stan"), alpha = 0.25) +
     theme_minimal() + 
     ylab("Nile")
-
-
-
 
 
 
