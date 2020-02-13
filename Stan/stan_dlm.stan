@@ -8,8 +8,8 @@ For a DLM we can write the joint density of the observations as
 The kalman filter gives us p(y_t | y_{1:t-1}, ...) at each time t. So we can use
 the output of kalman filter to define the loglikelihood needed by Stan. That is,
 
-        likelihood = \sum_{t=1}^T p(y_t | y_{1:t-1}, ...)
-                   = \sum_{t=1}^T N(y_t | ft, Qt)
+        likelihood = \prod_{t=1}^T p(y_t | y_{1:t-1}, ...)
+                   = \prod_{t=1}^T N(y_t | ft, Qt)
                 
 where, ft and Qt are given by the kalman filter.
 See, Chapter 4 - Dynamic Linear Models with R (Petris et. al) and
