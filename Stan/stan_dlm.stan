@@ -1,4 +1,19 @@
 /*
+Estimate the unknown observation and state covariance matrices for a DLM.
+
+For a DLM we can write the joint density of the observations as
+
+        p(y_1:T | ...) = \prod_{t=1}^T p(y_t | y_{1:t-1}, ...)
+
+The kalman filter gives us p(y_t | y_{1:t-1}, ...) at each time t. So we can use
+the output of kalman filter to define the loglikelihood needed by Stan. That is,
+
+        likelihood = \sum_{t=1}^T p(y_t | y_{1:t-1}, ...)
+                   = \sum_{t=1}^T N(y_t | ft, Qt)
+                
+where, ft and Qt are given by the kalman filter.
+See, Chapter 4 - Dynamic Linear Models with R (Petris et. al) and
+Chapter 7 - Time Series Analysis by State Space Methods (Durbin and Koopman)
 */
 functions {
     matrix D_svd(matrix M, int invert) {
