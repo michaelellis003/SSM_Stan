@@ -220,8 +220,8 @@ transformed parameters {
 model {
     real log_lik_obs[N];
     real log_lik;
-    V_L_Omega ~ lkj_corr_cholesky(2);
-    W_L_Omega ~ lkj_corr_cholesky(2);
+    V_L_Omega ~ lkj_corr_cholesky(1);
+    W_L_Omega ~ lkj_corr_cholesky(1);
     
     {
         vector[P] a;
@@ -233,6 +233,7 @@ model {
         matrix[P, P] C[N+1];
         matrix[P, P] U_C[N+1];
         matrix[P, P] D_C[N+1];
+        vector[M] mean_zero = rep_vector(0, M);
         
         // Store square root of W and V^-1
         matrix[P, P] N_W ;
@@ -260,12 +261,12 @@ model {
             matrix[2*P, P] sqrt_D_R;
             
             vector[M] err;
-            matrix[P+M, P] M_C;      // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
+            matrix[P+M, P] M_C;                     // U_R[N] * M_C[n]' * M_C[n] * U_R[N]' = C[n]^-1
             matrix[P, P] V_M_C;
             matrix[P+M, P] Dinv_M_C;
             
             a = GG * m[t];
-            M_R = make_MR(D_C[1], U_C[1], GG, N_W);
+            M_R = make_MR(D_C[t], U_C[t], GG, N_W);
             R = M_R' * M_R;                         //R = GG * C[t] * GG' + W;
             U_R = V_svd(M_R);
             sqrt_D_R = D_svd(M_R, 0);
@@ -273,10 +274,9 @@ model {
             
             f = FF * a;
             Q = FF * R * FF' + V;
+            log_lik_obs[t] = multi_normal_lpdf(y[t] | f, Q);
             
             err = y[t] - f;
-            log_lik_obs[t] = multi_normal_lpdf(err | rep_vector(0, M), Q);
-            
             Qinv = inverse(Q);
             m[t+1] = a + R * FF' * Qinv * err;
             
